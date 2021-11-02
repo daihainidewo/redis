@@ -70,6 +70,7 @@ func Slot(key string) int {
 	return int(crc16sum(key)) % slotNumber
 }
 
+//crc16sum crc16校验码
 func crc16sum(key string) (crc uint16) {
 	for i := 0; i < len(key); i++ {
 		crc = (crc << 8) ^ crc16tab[(byte(crc>>8)^key[i])&0x00ff]

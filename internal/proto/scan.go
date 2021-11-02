@@ -8,6 +8,7 @@ import (
 	"github.com/go-redis/redis/v8/internal/util"
 )
 
+//Scan 将b转为对应的v
 func Scan(b []byte, v interface{}) error {
 	switch v := v.(type) {
 	case nil:
@@ -107,6 +108,7 @@ func Scan(b []byte, v interface{}) error {
 	}
 }
 
+//ScanSlice 将字符串数组转为对应的对象数组
 func ScanSlice(data []string, slice interface{}) error {
 	v := reflect.ValueOf(slice)
 	if !v.IsValid() {
@@ -132,6 +134,7 @@ func ScanSlice(data []string, slice interface{}) error {
 	return nil
 }
 
+//makeSliceNextElemFunc 返回在slice后面添加新元素并返回新元素的方法
 func makeSliceNextElemFunc(v reflect.Value) func() reflect.Value {
 	elemType := v.Type().Elem()
 

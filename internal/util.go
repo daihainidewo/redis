@@ -63,6 +63,7 @@ func Unwrap(err error) error {
 	return u.Unwrap()
 }
 
+//AppendArg 把v转成字符串组追加到b中
 func AppendArg(b []byte, v interface{}) []byte {
 	switch v := v.(type) {
 	case nil:

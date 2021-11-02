@@ -196,6 +196,8 @@ func (r *Reader) ReadArrayLen() (int64, error) {
 	}
 }
 
+//ReadScanReply 读取数组
+//返回 数组内容 读取数据偏移量
 func (r *Reader) ReadScanReply() ([]string, uint64, error) {
 	n, err := r.ReadArrayLen()
 	if err != nil {
@@ -251,6 +253,7 @@ func (r *Reader) ReadFloatReply() (float64, error) {
 	return util.ParseFloat(b, 64)
 }
 
+//readTmpBytesReply 获取下一个段内容（错误，状态，字符串）
 func (r *Reader) readTmpBytesReply() ([]byte, error) {
 	line, err := r.ReadLine()
 	if err != nil {
@@ -268,6 +271,7 @@ func (r *Reader) readTmpBytesReply() ([]byte, error) {
 	}
 }
 
+//_readTmpBytesReply 通过 line 获取 bytes 长度 获取下一行 bytes
 func (r *Reader) _readTmpBytesReply(line []byte) ([]byte, error) {
 	if isNilReply(line) {
 		return nil, Nil
@@ -287,6 +291,7 @@ func (r *Reader) _readTmpBytesReply(line []byte) ([]byte, error) {
 	return buf[:replyLen], nil
 }
 
+//buf 并发安全？
 func (r *Reader) buf(n int) []byte {
 	if n <= cap(r._buf) {
 		return r._buf[:n]

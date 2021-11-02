@@ -79,6 +79,7 @@ func cmdFirstKeyPos(cmd Cmder, info *CommandInfo) int {
 	return int(info.FirstKeyPos)
 }
 
+//cmdString 将cmd和val拼接转化成string
 func cmdString(cmd Cmder, val interface{}) string {
 	b := make([]byte, 0, 64)
 
