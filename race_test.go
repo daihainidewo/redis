@@ -2,6 +2,7 @@ package redis_test
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"net"
 	"strconv"
@@ -9,10 +10,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-redis/redis/v8"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+
+	"github.com/go-redis/redis/v8"
 )
 
 var _ = Describe("races", func() {
@@ -266,7 +267,7 @@ var _ = Describe("races", func() {
 
 		wg := performAsync(C, func(id int) {
 			for {
-				v, err := client.BLPop(ctx, 3*time.Second, "list").Result()
+				v, err := client.BLPop(ctx, 5*time.Second, "list").Result()
 				if err != nil {
 					if err == redis.Nil {
 						break
@@ -294,6 +295,26 @@ var _ = Describe("races", func() {
 			err := client.WithContext(ctx).Ping(ctx).Err()
 			Expect(err).NotTo(HaveOccurred())
 		})
+	})
+
+	It("should abort on context timeout", func() {
+		opt := redisClusterOptions()
+		client := cluster.newClusterClient(ctx, opt)
+
+		ctx, cancel := context.WithCancel(context.Background())
+
+		wg := performAsync(C, func(_ int) {
+			_, err := client.XRead(ctx, &redis.XReadArgs{
+				Streams: []string{"test", "$"},
+				Block:   1 * time.Second,
+			}).Result()
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(Or(Equal(context.Canceled.Error()), ContainSubstring("operation was canceled")))
+		})
+
+		time.Sleep(10 * time.Millisecond)
+		cancel()
+		wg.Wait()
 	})
 })
 
@@ -351,6 +372,18 @@ var _ = Describe("cluster races", func() {
 		val, err := client.Get(ctx, key).Int64()
 		Expect(err).NotTo(HaveOccurred())
 		Expect(val).To(Equal(int64(C * N)))
+	})
+
+	It("write cmd data-race", func() {
+		pubsub := client.Subscribe(ctx)
+		defer pubsub.Close()
+
+		pubsub.Channel(redis.WithChannelHealthCheckInterval(time.Millisecond))
+		for i := 0; i < 100; i++ {
+			key := fmt.Sprintf("channel_%d", i)
+			pubsub.Subscribe(ctx, key)
+			pubsub.Unsubscribe(ctx, key)
+		}
 	})
 })
 

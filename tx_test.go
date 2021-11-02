@@ -5,10 +5,10 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/go-redis/redis/v8"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+
+	"github.com/go-redis/redis/v8"
 )
 
 var _ = Describe("Tx", func() {
@@ -129,7 +129,7 @@ var _ = Describe("Tx", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		cn.SetNetConn(&badConn{})
-		client.Pool().Put(cn)
+		client.Pool().Put(ctx, cn)
 
 		do := func() error {
 			err := client.Watch(ctx, func(tx *redis.Tx) error {

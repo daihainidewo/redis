@@ -1,10 +1,12 @@
 package redis_test
 
 import (
-	"github.com/go-redis/redis/v8"
+	"strconv"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+
+	"github.com/go-redis/redis/v8"
 )
 
 var _ = Describe("pipelining", func() {
@@ -66,6 +68,21 @@ var _ = Describe("pipelining", func() {
 			cmds, err := pipe.Exec(ctx)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(cmds).To(HaveLen(1))
+		})
+
+		It("handles large pipelines", func() {
+			for callCount := 1; callCount < 16; callCount++ {
+				for i := 1; i <= callCount; i++ {
+					pipe.SetNX(ctx, strconv.Itoa(i)+"_key", strconv.Itoa(i)+"_value", 0)
+				}
+
+				cmds, err := pipe.Exec(ctx)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cmds).To(HaveLen(callCount))
+				for _, cmd := range cmds {
+					Expect(cmd).To(BeAssignableToTypeOf(&redis.BoolCmd{}))
+				}
+			}
 		})
 	}
 

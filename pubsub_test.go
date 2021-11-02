@@ -1,24 +1,30 @@
 package redis_test
 
 import (
+	"context"
 	"io"
 	"net"
 	"sync"
 	"time"
 
-	"github.com/go-redis/redis/v8"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+
+	"github.com/go-redis/redis/v8"
 )
 
 var _ = Describe("PubSub", func() {
 	var client *redis.Client
+	var clientID int64
 
 	BeforeEach(func() {
 		opt := redisOptions()
 		opt.MinIdleConns = 0
 		opt.MaxConnAge = 0
+		opt.OnConnect = func(ctx context.Context, cn *redis.Conn) (err error) {
+			clientID, err = cn.ClientID(ctx).Result()
+			return err
+		}
 		client = redis.NewClient(opt)
 		Expect(client.FlushDB(ctx).Err()).NotTo(HaveOccurred())
 	})
@@ -415,6 +421,30 @@ var _ = Describe("PubSub", func() {
 		Expect(msg.Payload).To(Equal(string(bigVal)))
 	})
 
+	It("handles message payload slice with server-assisted client-size caching", func() {
+		pubsub := client.Subscribe(ctx, "__redis__:invalidate")
+		defer pubsub.Close()
+
+		client2 := redis.NewClient(redisOptions())
+		defer client2.Close()
+
+		err := client2.Do(ctx, "CLIENT", "TRACKING", "on", "REDIRECT", clientID).Err()
+		Expect(err).NotTo(HaveOccurred())
+
+		err = client2.Do(ctx, "GET", "mykey").Err()
+		Expect(err).To(Equal(redis.Nil))
+
+		err = client2.Do(ctx, "SET", "mykey", "myvalue").Err()
+		Expect(err).NotTo(HaveOccurred())
+
+		ch := pubsub.Channel()
+
+		var msg *redis.Message
+		Eventually(ch).Should(Receive(&msg))
+		Expect(msg.Channel).To(Equal("__redis__:invalidate"))
+		Expect(msg.PayloadSlice).To(Equal([]string{"mykey"}))
+	})
+
 	It("supports concurrent Ping and Receive", func() {
 		const N = 100
 
@@ -442,5 +472,24 @@ var _ = Describe("PubSub", func() {
 		case <-time.After(30 * time.Second):
 			Fail("timeout")
 		}
+	})
+
+	It("should ChannelMessage", func() {
+		pubsub := client.Subscribe(ctx, "mychannel")
+		defer pubsub.Close()
+
+		ch := pubsub.Channel(
+			redis.WithChannelSize(10),
+			redis.WithChannelHealthCheckInterval(time.Second),
+		)
+
+		text := "test channel message"
+		err := client.Publish(ctx, "mychannel", text).Err()
+		Expect(err).NotTo(HaveOccurred())
+
+		var msg *redis.Message
+		Eventually(ch).Should(Receive(&msg))
+		Expect(msg.Channel).To(Equal("mychannel"))
+		Expect(msg.Payload).To(Equal(text))
 	})
 })

@@ -39,13 +39,14 @@ func ExampleNewClient() {
 }
 
 func ExampleParseURL() {
-	opt, err := redis.ParseURL("redis://:qwerty@localhost:6379/1")
+	opt, err := redis.ParseURL("redis://:qwerty@localhost:6379/1?dial_timeout=5s")
 	if err != nil {
 		panic(err)
 	}
 	fmt.Println("addr is", opt.Addr)
 	fmt.Println("db is", opt.DB)
 	fmt.Println("password is", opt.Password)
+	fmt.Println("dial timeout is", opt.DialTimeout)
 
 	// Create client as usually.
 	_ = redis.NewClient(opt)
@@ -53,6 +54,7 @@ func ExampleParseURL() {
 	// Output: addr is localhost:6379
 	// db is 1
 	// password is qwerty
+	// dial timeout is 5s
 }
 
 func ExampleNewFailoverClient() {
@@ -80,7 +82,7 @@ func ExampleNewClusterClient_manualSetup() {
 	// clusterSlots returns cluster slots information.
 	// It can use service like ZooKeeper to maintain configuration information
 	// and Cluster.ReloadState to manually trigger state reloading.
-	clusterSlots := func() ([]redis.ClusterSlot, error) {
+	clusterSlots := func(ctx context.Context) ([]redis.ClusterSlot, error) {
 		slots := []redis.ClusterSlot{
 			// First node with 1 master and 1 slave.
 			{
@@ -114,10 +116,7 @@ func ExampleNewClusterClient_manualSetup() {
 
 	// ReloadState reloads cluster state. It calls ClusterSlots func
 	// to get cluster slots information.
-	err := rdb.ReloadState(ctx)
-	if err != nil {
-		panic(err)
-	}
+	rdb.ReloadState(ctx)
 }
 
 func ExampleNewRing() {
@@ -191,6 +190,13 @@ func ExampleClient_Set() {
 	}
 }
 
+func ExampleClient_SetEX() {
+	err := rdb.SetEX(ctx, "key", "value", time.Hour).Err()
+	if err != nil {
+		panic(err)
+	}
+}
+
 func ExampleClient_Incr() {
 	result, err := rdb.Incr(ctx, "counter").Result()
 	if err != nil {
@@ -242,6 +248,101 @@ func ExampleClient_Scan() {
 
 	fmt.Printf("found %d keys\n", n)
 	// Output: found 33 keys
+}
+
+func ExampleClient_ScanType() {
+	rdb.FlushDB(ctx)
+	for i := 0; i < 33; i++ {
+		err := rdb.Set(ctx, fmt.Sprintf("key%d", i), "value", 0).Err()
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	var cursor uint64
+	var n int
+	for {
+		var keys []string
+		var err error
+		keys, cursor, err = rdb.ScanType(ctx, cursor, "key*", 10, "string").Result()
+		if err != nil {
+			panic(err)
+		}
+		n += len(keys)
+		if cursor == 0 {
+			break
+		}
+	}
+
+	fmt.Printf("found %d keys\n", n)
+	// Output: found 33 keys
+}
+
+// ExampleStringStringMapCmd_Scan shows how to scan the results of a map fetch
+// into a struct.
+func ExampleStringStringMapCmd_Scan() {
+	rdb.FlushDB(ctx)
+	err := rdb.HMSet(ctx, "map",
+		"name", "hello",
+		"count", 123,
+		"correct", true).Err()
+	if err != nil {
+		panic(err)
+	}
+
+	// Get the map. The same approach works for HmGet().
+	res := rdb.HGetAll(ctx, "map")
+	if res.Err() != nil {
+		panic(err)
+	}
+
+	type data struct {
+		Name    string `redis:"name"`
+		Count   int    `redis:"count"`
+		Correct bool   `redis:"correct"`
+	}
+
+	// Scan the results into the struct.
+	var d data
+	if err := res.Scan(&d); err != nil {
+		panic(err)
+	}
+
+	fmt.Println(d)
+	// Output: {hello 123 true}
+}
+
+// ExampleSliceCmd_Scan shows how to scan the results of a multi key fetch
+// into a struct.
+func ExampleSliceCmd_Scan() {
+	rdb.FlushDB(ctx)
+	err := rdb.MSet(ctx,
+		"name", "hello",
+		"count", 123,
+		"correct", true).Err()
+	if err != nil {
+		panic(err)
+	}
+
+	res := rdb.MGet(ctx, "name", "count", "empty", "correct")
+	if res.Err() != nil {
+		panic(err)
+	}
+
+	type data struct {
+		Name    string `redis:"name"`
+		Count   int    `redis:"count"`
+		Correct bool   `redis:"correct"`
+	}
+
+	// Scan the results into the struct.
+	var d data
+	if err := res.Scan(&d); err != nil {
+		panic(err)
+	}
+
+	fmt.Println(d)
+	// Output: {hello 123 true}
 }
 
 func ExampleClient_Pipelined() {
@@ -318,7 +419,7 @@ func ExampleClient_Watch() {
 			// Actual opperation (local in optimistic lock).
 			n++
 
-			// Operation is commited only if the watched keys remain unchanged.
+			// Operation is committed only if the watched keys remain unchanged.
 			_, err = tx.TxPipelined(ctx, func(pipe redis.Pipeliner) error {
 				pipe.Set(ctx, key, n, 0)
 				return nil
@@ -509,4 +610,25 @@ func ExampleNewUniversalClient_cluster() {
 	defer rdb.Close()
 
 	rdb.Ping(ctx)
+}
+
+func ExampleClient_SlowLogGet() {
+	const key = "slowlog-log-slower-than"
+
+	old := rdb.ConfigGet(ctx, key).Val()
+	rdb.ConfigSet(ctx, key, "0")
+	defer rdb.ConfigSet(ctx, key, old[1].(string))
+
+	if err := rdb.Do(ctx, "slowlog", "reset").Err(); err != nil {
+		panic(err)
+	}
+
+	rdb.Set(ctx, "test", "true", 0)
+
+	result, err := rdb.SlowLogGet(ctx, -1).Result()
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(len(result))
+	// Output: 2
 }
