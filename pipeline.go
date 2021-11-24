@@ -9,6 +9,7 @@ import (
 
 type pipelineExecer func(context.Context, []Cmder) error
 
+// Pipeliner 批量发送接口
 // Pipeliner is an mechanism to realise Redis Pipeline technique.
 //
 // Pipelining is a technique to extremely speed up processing by packing

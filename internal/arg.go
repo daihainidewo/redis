@@ -6,6 +6,7 @@ import (
 	"time"
 )
 
+// AppendArg 格式转换
 func AppendArg(b []byte, v interface{}) []byte {
 	switch v := v.(type) {
 	case nil:

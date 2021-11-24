@@ -46,6 +46,7 @@ func cmdsFirstErr(cmds []Cmder) error {
 	return nil
 }
 
+// 向wr写入cmds
 func writeCmds(wr *proto.Writer, cmds []Cmder) error {
 	for _, cmd := range cmds {
 		if err := writeCmd(wr, cmd); err != nil {
@@ -55,6 +56,7 @@ func writeCmds(wr *proto.Writer, cmds []Cmder) error {
 	return nil
 }
 
+// 向wr中写入cmd
 func writeCmd(wr *proto.Writer, cmd Cmder) error {
 	return wr.WriteArgs(cmd.Args())
 }
@@ -86,7 +88,7 @@ func cmdFirstKeyPos(cmd Cmder, info *CommandInfo) int {
 	return 0
 }
 
-//cmdString 将cmd和val拼接转化成string
+// 将cmd和val拼接转化成string
 func cmdString(cmd Cmder, val interface{}) string {
 	b := make([]byte, 0, 64)
 
@@ -110,6 +112,7 @@ func cmdString(cmd Cmder, val interface{}) string {
 
 //------------------------------------------------------------------------------
 
+// 基础命令
 type baseCmd struct {
 	ctx    context.Context
 	args   []interface{}
@@ -148,6 +151,7 @@ func (cmd *baseCmd) Args() []interface{} {
 	return cmd.args
 }
 
+// 返回指定参数
 func (cmd *baseCmd) stringArg(pos int) string {
 	if pos < 0 || pos >= len(cmd.args) {
 		return ""
@@ -156,6 +160,7 @@ func (cmd *baseCmd) stringArg(pos int) string {
 	return s
 }
 
+// 第一个key的位置
 func (cmd *baseCmd) firstKeyPos() int8 {
 	return cmd.keyPos
 }
@@ -182,6 +187,7 @@ func (cmd *baseCmd) setReadTimeout(d time.Duration) {
 
 //------------------------------------------------------------------------------
 
+// Cmd 请求响应结结构
 type Cmd struct {
 	baseCmd
 
@@ -209,6 +215,7 @@ func (cmd *Cmd) Val() interface{} {
 	return cmd.val
 }
 
+// Result 返回原始返回值
 func (cmd *Cmd) Result() (interface{}, error) {
 	return cmd.val, cmd.err
 }
@@ -458,11 +465,13 @@ func (cmd *Cmd) BoolSlice() ([]bool, error) {
 	return bools, nil
 }
 
+// 读取响应 并设置
 func (cmd *Cmd) readReply(rd *proto.Reader) (err error) {
 	cmd.val, err = rd.ReadReply(sliceParser)
 	return err
 }
 
+// 解析多个
 // sliceParser implements proto.MultiBulkParse.
 func sliceParser(rd *proto.Reader, n int64) (interface{}, error) {
 	vals := make([]interface{}, n)

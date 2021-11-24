@@ -55,6 +55,7 @@ func (r *Reader) Reset(rd io.Reader) {
 	r.rd.Reset(rd)
 }
 
+// ReadLine 读取一行
 func (r *Reader) ReadLine() ([]byte, error) {
 	line, err := r.readLine()
 	if err != nil {
@@ -66,6 +67,7 @@ func (r *Reader) ReadLine() ([]byte, error) {
 	return line, nil
 }
 
+// 读取下一行
 // readLine that returns an error if:
 //   - there is a pending read error;
 //   - or line does not end with \r\n.
@@ -93,6 +95,7 @@ func (r *Reader) readLine() ([]byte, error) {
 	return b[:len(b)-2], nil
 }
 
+// ReadReply 批量解析RESP协议
 func (r *Reader) ReadReply(m MultiBulkParse) (interface{}, error) {
 	line, err := r.ReadLine()
 	if err != nil {
@@ -122,6 +125,7 @@ func (r *Reader) ReadReply(m MultiBulkParse) (interface{}, error) {
 	return nil, fmt.Errorf("redis: can't parse %.100q", line)
 }
 
+// ReadIntReply 读取下一行为int的响应
 func (r *Reader) ReadIntReply() (int64, error) {
 	line, err := r.ReadLine()
 	if err != nil {
@@ -137,6 +141,7 @@ func (r *Reader) ReadIntReply() (int64, error) {
 	}
 }
 
+// ReadString 读取下一行为string的响应
 func (r *Reader) ReadString() (string, error) {
 	line, err := r.ReadLine()
 	if err != nil {
@@ -156,6 +161,7 @@ func (r *Reader) ReadString() (string, error) {
 	}
 }
 
+// 读取字符串响应
 func (r *Reader) readStringReply(line []byte) (string, error) {
 	if isNilReply(line) {
 		return "", Nil
@@ -175,6 +181,7 @@ func (r *Reader) readStringReply(line []byte) (string, error) {
 	return util.BytesToString(b[:replyLen]), nil
 }
 
+// ReadArrayReply 读取数组响应
 func (r *Reader) ReadArrayReply(m MultiBulkParse) (interface{}, error) {
 	line, err := r.ReadLine()
 	if err != nil {
@@ -194,6 +201,7 @@ func (r *Reader) ReadArrayReply(m MultiBulkParse) (interface{}, error) {
 	}
 }
 
+// ReadArrayLen 读取数组长度
 func (r *Reader) ReadArrayLen() (int, error) {
 	line, err := r.ReadLine()
 	if err != nil {
@@ -213,8 +221,8 @@ func (r *Reader) ReadArrayLen() (int, error) {
 	}
 }
 
-//ReadScanReply 读取数组
-//返回 数组内容 读取数据偏移量
+// ReadScanReply 读取数组
+// 返回 数组内容 读取数据偏移量
 func (r *Reader) ReadScanReply() ([]string, uint64, error) {
 	n, err := r.ReadArrayLen()
 	if err != nil {
@@ -247,6 +255,8 @@ func (r *Reader) ReadScanReply() ([]string, uint64, error) {
 	return keys, cursor, err
 }
 
+// 数字处理函数
+
 func (r *Reader) ReadInt() (int64, error) {
 	b, err := r.readTmpBytesReply()
 	if err != nil {
@@ -271,7 +281,7 @@ func (r *Reader) ReadFloatReply() (float64, error) {
 	return util.ParseFloat(b, 64)
 }
 
-//readTmpBytesReply 获取下一个段内容（错误，状态，字符串）
+// 获取下一个行内容（错误 状态 字符串）
 func (r *Reader) readTmpBytesReply() ([]byte, error) {
 	line, err := r.ReadLine()
 	if err != nil {
@@ -289,7 +299,7 @@ func (r *Reader) readTmpBytesReply() ([]byte, error) {
 	}
 }
 
-//_readTmpBytesReply 通过 line 获取 bytes 长度 获取下一行 bytes
+// 通过 line 获取 bytes 长度 获取下一行 bytes
 func (r *Reader) _readTmpBytesReply(line []byte) ([]byte, error) {
 	if isNilReply(line) {
 		return nil, Nil
@@ -309,7 +319,7 @@ func (r *Reader) _readTmpBytesReply(line []byte) ([]byte, error) {
 	return buf[:replyLen], nil
 }
 
-//buf 并发安全？
+// 并发安全？始终只有一个协程占用当前连接
 func (r *Reader) buf(n int) []byte {
 	if n <= cap(r._buf) {
 		return r._buf[:n]
@@ -319,16 +329,21 @@ func (r *Reader) buf(n int) []byte {
 	return r._buf
 }
 
+// 行处理函数
+
+// 判断是否是空响应
 func isNilReply(b []byte) bool {
 	return len(b) == 3 &&
 		(b[0] == StringReply || b[0] == ArrayReply) &&
 		b[1] == '-' && b[2] == '1'
 }
 
+// ParseErrorReply 解析错误响应
 func ParseErrorReply(line []byte) error {
 	return RedisError(string(line[1:]))
 }
 
+// 解析数组长度
 func parseArrayLen(line []byte) (int64, error) {
 	if isNilReply(line) {
 		return 0, Nil

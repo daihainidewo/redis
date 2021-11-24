@@ -6,6 +6,7 @@ import (
 	"github.com/go-redis/redis/v8/internal/rand"
 )
 
+// RetryBackoff 通过重试次数和最小最大时间算出当前时间
 func RetryBackoff(retry int, minBackoff, maxBackoff time.Duration) time.Duration {
 	if retry < 0 {
 		panic("not reached")

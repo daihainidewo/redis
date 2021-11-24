@@ -78,6 +78,7 @@ func appendArg(dst []interface{}, arg interface{}) []interface{} {
 	}
 }
 
+// Cmddable 普通命令
 type Cmdable interface {
 	Pipeline() Pipeliner
 	Pipelined(ctx context.Context, fn func(Pipeliner) error) ([]Cmder, error)
@@ -392,6 +393,7 @@ type Cmdable interface {
 	GeoHash(ctx context.Context, key string, members ...string) *StringSliceCmd
 }
 
+// StatefulCmdable 有状态的请求
 type StatefulCmdable interface {
 	Cmdable
 	Auth(ctx context.Context, password string) *StatusCmd
@@ -408,8 +410,10 @@ var (
 	_ Cmdable = (*ClusterClient)(nil)
 )
 
+// 执行命令的方法体
 type cmdable func(ctx context.Context, cmd Cmder) error
 
+// 需要有状态的执行命令
 type statefulCmdable func(ctx context.Context, cmd Cmder) error
 
 //------------------------------------------------------------------------------

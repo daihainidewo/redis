@@ -2,6 +2,7 @@ package pool
 
 import "context"
 
+// SingleConnPool 只针对单链接进行连接池操作
 type SingleConnPool struct {
 	pool      Pooler
 	cn        *Conn

@@ -413,6 +413,7 @@ func getUserPassword(u *url.URL) (string, string) {
 	return user, password
 }
 
+// 默认连接池
 func newConnPool(opt *Options) *pool.ConnPool {
 	return pool.NewConnPool(&pool.Options{
 		Dialer: func(ctx context.Context) (net.Conn, error) {

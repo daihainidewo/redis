@@ -17,6 +17,7 @@ type writer interface {
 	WriteString(s string) (n int, err error)
 }
 
+// Writer RESP 协议写入器
 type Writer struct {
 	writer
 
@@ -33,6 +34,7 @@ func NewWriter(wr writer) *Writer {
 	}
 }
 
+// WriteArgs 写入数组数据
 func (w *Writer) WriteArgs(args []interface{}) error {
 	if err := w.WriteByte(ArrayReply); err != nil {
 		return err
@@ -51,6 +53,7 @@ func (w *Writer) WriteArgs(args []interface{}) error {
 	return nil
 }
 
+// 写入数字
 func (w *Writer) writeLen(n int) error {
 	w.lenBuf = strconv.AppendUint(w.lenBuf[:0], uint64(n), 10)
 	w.lenBuf = append(w.lenBuf, '\r', '\n')
@@ -58,6 +61,7 @@ func (w *Writer) writeLen(n int) error {
 	return err
 }
 
+// WriteArg 序列化参数写入w
 func (w *Writer) WriteArg(v interface{}) error {
 	switch v := v.(type) {
 	case nil:
@@ -112,6 +116,7 @@ func (w *Writer) WriteArg(v interface{}) error {
 	}
 }
 
+// 写入字符串数据
 func (w *Writer) bytes(b []byte) error {
 	if err := w.WriteByte(StringReply); err != nil {
 		return err
@@ -147,6 +152,7 @@ func (w *Writer) float(f float64) error {
 	return w.bytes(w.numBuf)
 }
 
+// 写入换行
 func (w *Writer) crlf() error {
 	if err := w.WriteByte('\r'); err != nil {
 		return err

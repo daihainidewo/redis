@@ -38,6 +38,7 @@ type Stats struct {
 	StaleConns uint32 // number of stale connections removed from the pool
 }
 
+// Pooler 连接池接口
 type Pooler interface {
 	NewConn(context.Context) (*Conn, error)
 	CloseConn(*Conn) error

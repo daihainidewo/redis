@@ -25,14 +25,18 @@ type Error interface {
 
 var _ Error = proto.RedisError("")
 
+// 判断错误是否需要重试请求
 func shouldRetry(err error, retryTimeout bool) bool {
 	switch err {
 	case io.EOF, io.ErrUnexpectedEOF:
+		// 连接断开
 		return true
 	case nil, context.Canceled, context.DeadlineExceeded:
+		// 上线文取消
 		return false
 	}
 
+	// 超时错误
 	if v, ok := err.(timeoutError); ok {
 		if v.Timeout() {
 			return retryTimeout
@@ -40,6 +44,7 @@ func shouldRetry(err error, retryTimeout bool) bool {
 		return true
 	}
 
+	// 其他错误
 	s := err.Error()
 	if s == "ERR max number of clients reached" {
 		return true

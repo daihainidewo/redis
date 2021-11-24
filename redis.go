@@ -21,6 +21,7 @@ func SetLogger(logger internal.Logging) {
 
 //------------------------------------------------------------------------------
 
+// Hook 执行操作的hook 分为单命令和多命令
 type Hook interface {
 	BeforeProcess(ctx context.Context, cmd Cmder) (context.Context, error)
 	AfterProcess(ctx context.Context, cmd Cmder) error
@@ -47,6 +48,7 @@ func (hs *hooks) AddHook(hook Hook) {
 	hs.hooks = append(hs.hooks, hook)
 }
 
+// 单命令
 func (hs hooks) process(
 	ctx context.Context, cmd Cmder, fn func(context.Context, Cmder) error,
 ) error {
@@ -81,6 +83,7 @@ func (hs hooks) process(
 	return retErr
 }
 
+// 多命令
 func (hs hooks) processPipeline(
 	ctx context.Context, cmds []Cmder, fn func(context.Context, []Cmder) error,
 ) error {
@@ -113,6 +116,7 @@ func (hs hooks) processPipeline(
 	return retErr
 }
 
+// 事务多命令
 func (hs hooks) processTxPipeline(
 	ctx context.Context, cmds []Cmder, fn func(context.Context, []Cmder) error,
 ) error {
@@ -122,6 +126,7 @@ func (hs hooks) processTxPipeline(
 
 //------------------------------------------------------------------------------
 
+// 封装对连接对象的操作
 type baseClient struct {
 	opt      *Options
 	connPool pool.Pooler
@@ -156,6 +161,7 @@ func (c *baseClient) String() string {
 	return fmt.Sprintf("Redis<%s db:%d>", c.getAddr(), c.opt.DB)
 }
 
+// 新建redis连接
 func (c *baseClient) newConn(ctx context.Context) (*pool.Conn, error) {
 	cn, err := c.connPool.NewConn(ctx)
 	if err != nil {
@@ -171,8 +177,10 @@ func (c *baseClient) newConn(ctx context.Context) (*pool.Conn, error) {
 	return cn, nil
 }
 
+// 获取可执行命令的连接
 func (c *baseClient) getConn(ctx context.Context) (*pool.Conn, error) {
 	if c.opt.Limiter != nil {
+		// 限制器
 		err := c.opt.Limiter.Allow()
 		if err != nil {
 			return nil, err
@@ -182,6 +190,7 @@ func (c *baseClient) getConn(ctx context.Context) (*pool.Conn, error) {
 	cn, err := c._getConn(ctx)
 	if err != nil {
 		if c.opt.Limiter != nil {
+			// 汇报错误
 			c.opt.Limiter.ReportResult(err)
 		}
 		return nil, err
@@ -190,6 +199,7 @@ func (c *baseClient) getConn(ctx context.Context) (*pool.Conn, error) {
 	return cn, nil
 }
 
+// 从连接池中获取连接
 func (c *baseClient) _getConn(ctx context.Context) (*pool.Conn, error) {
 	cn, err := c.connPool.Get(ctx)
 	if err != nil {
@@ -200,7 +210,9 @@ func (c *baseClient) _getConn(ctx context.Context) (*pool.Conn, error) {
 		return cn, nil
 	}
 
+	// 初始化连接
 	if err := c.initConn(ctx, cn); err != nil {
+		// 初始化失败就将连接从连接池中删除
 		c.connPool.Remove(ctx, cn, err)
 		if err := errors.Unwrap(err); err != nil {
 			return nil, err
@@ -211,6 +223,7 @@ func (c *baseClient) _getConn(ctx context.Context) (*pool.Conn, error) {
 	return cn, nil
 }
 
+// 初始化连接
 func (c *baseClient) initConn(ctx context.Context, cn *pool.Conn) error {
 	if cn.Inited {
 		return nil
@@ -224,6 +237,7 @@ func (c *baseClient) initConn(ctx context.Context, cn *pool.Conn) error {
 		return nil
 	}
 
+	// 建立一个只返回同一个连接的对象池
 	connPool := pool.NewSingleConnPool(c.connPool, cn)
 	conn := newConn(ctx, c.opt, connPool)
 
@@ -256,6 +270,7 @@ func (c *baseClient) initConn(ctx context.Context, cn *pool.Conn) error {
 	return nil
 }
 
+// 向连接池归还连接
 func (c *baseClient) releaseConn(ctx context.Context, cn *pool.Conn, err error) {
 	if c.opt.Limiter != nil {
 		c.opt.Limiter.ReportResult(err)
@@ -268,6 +283,7 @@ func (c *baseClient) releaseConn(ctx context.Context, cn *pool.Conn, err error) 
 	}
 }
 
+// 找连接 执行fn
 func (c *baseClient) withConn(
 	ctx context.Context, fn func(context.Context, *pool.Conn) error,
 ) error {
@@ -283,6 +299,7 @@ func (c *baseClient) withConn(
 	done := ctx.Done() //nolint:ifshort
 
 	if done == nil {
+		// 如果没有关闭通知就直接调用
 		err = fn(ctx, cn)
 		return err
 	}
@@ -303,6 +320,7 @@ func (c *baseClient) withConn(
 	}
 }
 
+// 带有重试机制的请求
 func (c *baseClient) process(ctx context.Context, cmd Cmder) error {
 	var lastErr error
 	for attempt := 0; attempt <= c.opt.MaxRetries; attempt++ {
@@ -318,6 +336,7 @@ func (c *baseClient) process(ctx context.Context, cmd Cmder) error {
 	return lastErr
 }
 
+// 发送请求接收响应
 func (c *baseClient) _process(ctx context.Context, cmd Cmder, attempt int) (bool, error) {
 	if attempt > 0 {
 		if err := internal.Sleep(ctx, c.retryBackoff(attempt)); err != nil {
@@ -352,10 +371,12 @@ func (c *baseClient) _process(ctx context.Context, cmd Cmder, attempt int) (bool
 	return retry, err
 }
 
+// 根据尝试次数计算休眠时间
 func (c *baseClient) retryBackoff(attempt int) time.Duration {
 	return internal.RetryBackoff(attempt, c.opt.MinRetryBackoff, c.opt.MaxRetryBackoff)
 }
 
+// 返回读超时
 func (c *baseClient) cmdTimeout(cmd Cmder) time.Duration {
 	if timeout := cmd.readTimeout(); timeout != nil {
 		t := *timeout
@@ -367,6 +388,7 @@ func (c *baseClient) cmdTimeout(cmd Cmder) time.Duration {
 	return c.opt.ReadTimeout
 }
 
+// Close 关闭客户端 释放所有的连接
 // Close closes the client, releasing any open resources.
 //
 // It is rare to Close a Client, as the Client is meant to be
@@ -374,6 +396,7 @@ func (c *baseClient) cmdTimeout(cmd Cmder) time.Duration {
 func (c *baseClient) Close() error {
 	var firstErr error
 	if c.onClose != nil {
+		// 执行事件操作
 		if err := c.onClose(); err != nil {
 			firstErr = err
 		}
@@ -396,6 +419,7 @@ func (c *baseClient) processTxPipeline(ctx context.Context, cmds []Cmder) error 
 	return c.generalProcessPipeline(ctx, cmds, c.txPipelineProcessCmds)
 }
 
+// 批量处理器
 type pipelineProcessor func(context.Context, *pool.Conn, []Cmder) (bool, error)
 
 func (c *baseClient) generalProcessPipeline(
@@ -409,17 +433,20 @@ func (c *baseClient) generalProcessPipeline(
 	return cmdsFirstErr(cmds)
 }
 
+// 实际执行操作函数
 func (c *baseClient) _generalProcessPipeline(
 	ctx context.Context, cmds []Cmder, p pipelineProcessor,
 ) error {
 	var lastErr error
 	for attempt := 0; attempt <= c.opt.MaxRetries; attempt++ {
 		if attempt > 0 {
+			// 重试等待
 			if err := internal.Sleep(ctx, c.retryBackoff(attempt)); err != nil {
 				return err
 			}
 		}
 
+		// 找 一条连接 执行 p
 		var canRetry bool
 		lastErr = c.withConn(ctx, func(ctx context.Context, cn *pool.Conn) error {
 			var err error
@@ -433,9 +460,11 @@ func (c *baseClient) _generalProcessPipeline(
 	return lastErr
 }
 
+// 批量处理多个命令
 func (c *baseClient) pipelineProcessCmds(
 	ctx context.Context, cn *pool.Conn, cmds []Cmder,
 ) (bool, error) {
+	// 批量写入命令
 	err := cn.WithWriter(ctx, c.opt.WriteTimeout, func(wr *proto.Writer) error {
 		return writeCmds(wr, cmds)
 	})
@@ -443,12 +472,14 @@ func (c *baseClient) pipelineProcessCmds(
 		return true, err
 	}
 
+	// 批量读取响应
 	err = cn.WithReader(ctx, c.opt.ReadTimeout, func(rd *proto.Reader) error {
 		return pipelineReadCmds(rd, cmds)
 	})
 	return true, err
 }
 
+// 批量处理响应
 func pipelineReadCmds(rd *proto.Reader, cmds []Cmder) error {
 	for _, cmd := range cmds {
 		err := cmd.readReply(rd)
@@ -460,6 +491,7 @@ func pipelineReadCmds(rd *proto.Reader, cmds []Cmder) error {
 	return nil
 }
 
+// 事务执行多个命令 返回时剔除事务请求的响应
 func (c *baseClient) txPipelineProcessCmds(
 	ctx context.Context, cn *pool.Conn, cmds []Cmder,
 ) (bool, error) {
@@ -475,6 +507,7 @@ func (c *baseClient) txPipelineProcessCmds(
 		// Trim multi and exec.
 		cmds = cmds[1 : len(cmds)-1]
 
+		// 预处理事务响应头部返回数据
 		err := txPipelineReadQueued(rd, statusCmd, cmds)
 		if err != nil {
 			return err
@@ -485,6 +518,7 @@ func (c *baseClient) txPipelineProcessCmds(
 	return false, err
 }
 
+// 封装事务执行命令
 func wrapMultiExec(ctx context.Context, cmds []Cmder) []Cmder {
 	if len(cmds) == 0 {
 		panic("not reached")
@@ -496,12 +530,14 @@ func wrapMultiExec(ctx context.Context, cmds []Cmder) []Cmder {
 	return cmdCopy
 }
 
+// 处理事务读取管道
 func txPipelineReadQueued(rd *proto.Reader, statusCmd *StatusCmd, cmds []Cmder) error {
 	// Parse queued replies.
 	if err := statusCmd.readReply(rd); err != nil {
 		return err
 	}
 
+	// 查看每个命令执行的返回结果
 	for range cmds {
 		if err := statusCmd.readReply(rd); err != nil && !isRedisError(err) {
 			return err
@@ -532,6 +568,7 @@ func txPipelineReadQueued(rd *proto.Reader, statusCmd *StatusCmd, cmds []Cmder) 
 
 //------------------------------------------------------------------------------
 
+// Client 并发安全的 带有连接池的 客户端
 // Client is a Redis client representing a pool of zero or more
 // underlying connections. It's safe for concurrent use by multiple
 // goroutines.
@@ -544,6 +581,7 @@ type Client struct {
 
 // NewClient returns a client to the Redis Server specified by Options.
 func NewClient(opt *Options) *Client {
+	// 检测参数 设置默认值
 	opt.init()
 
 	c := Client{
@@ -644,6 +682,7 @@ func (c *Client) TxPipeline() Pipeliner {
 	return &pipe
 }
 
+// 发布订阅
 func (c *Client) pubSub() *PubSub {
 	pubsub := &PubSub{
 		opt: c.opt,
@@ -703,6 +742,7 @@ func (c *Client) PSubscribe(ctx context.Context, channels ...string) *PubSub {
 
 //------------------------------------------------------------------------------
 
+// 连接
 type conn struct {
 	baseClient
 	cmdable
@@ -710,6 +750,7 @@ type conn struct {
 	hooks // TODO: inherit hooks
 }
 
+// Conn 表示单一连接
 // Conn represents a single Redis connection rather than a pool of connections.
 // Prefer running commands from Client unless there is a specific need
 // for a continuous single Redis connection.
@@ -718,6 +759,7 @@ type Conn struct {
 	ctx context.Context
 }
 
+// 新建连接对象
 func newConn(ctx context.Context, opt *Options, connPool pool.Pooler) *Conn {
 	c := Conn{
 		conn: &conn{
@@ -733,14 +775,17 @@ func newConn(ctx context.Context, opt *Options, connPool pool.Pooler) *Conn {
 	return &c
 }
 
+// Process 处理单条命令
 func (c *Conn) Process(ctx context.Context, cmd Cmder) error {
 	return c.hooks.process(ctx, cmd, c.baseClient.process)
 }
 
+// 处理多条命令
 func (c *Conn) processPipeline(ctx context.Context, cmds []Cmder) error {
 	return c.hooks.processPipeline(ctx, cmds, c.baseClient.processPipeline)
 }
 
+// 事务处理多条命令
 func (c *Conn) processTxPipeline(ctx context.Context, cmds []Cmder) error {
 	return c.hooks.processTxPipeline(ctx, cmds, c.baseClient.processTxPipeline)
 }

@@ -7,6 +7,7 @@ import (
 	"github.com/go-redis/redis/v8/internal/util"
 )
 
+// Sleep 带有ctx的休眠
 func Sleep(ctx context.Context, dur time.Duration) error {
 	t := time.NewTimer(dur)
 	defer t.Stop()
