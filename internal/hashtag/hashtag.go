@@ -47,6 +47,7 @@ var crc16tab = [256]uint16{
 	0x6e17, 0x7e36, 0x4e55, 0x5e74, 0x2e93, 0x3eb2, 0x0ed1, 0x1ef0,
 }
 
+// Key 判定是否有集群标签
 func Key(key string) string {
 	if s := strings.IndexByte(key, '{'); s > -1 {
 		if e := strings.IndexByte(key[s+1:], '}'); e > 0 {
@@ -60,6 +61,7 @@ func RandomSlot() int {
 	return rand.Intn(slotNumber)
 }
 
+// Slot 计算插槽
 // Slot returns a consistent slot number between 0 and 16383
 // for any given string key.
 func Slot(key string) int {
@@ -70,7 +72,7 @@ func Slot(key string) int {
 	return int(crc16sum(key)) % slotNumber
 }
 
-//crc16sum crc16校验码
+// crc16sum crc16校验码
 func crc16sum(key string) (crc uint16) {
 	for i := 0; i < len(key); i++ {
 		crc = (crc << 8) ^ crc16tab[(byte(crc>>8)^key[i])&0x00ff]

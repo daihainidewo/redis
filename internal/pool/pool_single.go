@@ -2,7 +2,8 @@ package pool
 
 import "context"
 
-// SingleConnPool 只针对单链接进行连接池操作
+// SingleConnPool 只针对单连接进行连接池操作
+// 用于单连接发送多条命令
 type SingleConnPool struct {
 	pool      Pooler
 	cn        *Conn

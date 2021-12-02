@@ -17,6 +17,7 @@ func newStructMap() *structMap {
 	return new(structMap)
 }
 
+// 获取反射操作者 没有就新建
 func (s *structMap) get(t reflect.Type) *structSpec {
 	if v, ok := s.m.Load(t); ok {
 		return v.(*structSpec)
@@ -74,11 +75,13 @@ type structField struct {
 
 //------------------------------------------------------------------------------
 
+// StructValue 基于hash的map[string]string反射到对应的结构体
 type StructValue struct {
 	spec  *structSpec
 	value reflect.Value
 }
 
+// Scan 将key和value反射到目标结构体中
 func (s StructValue) Scan(key string, value string) error {
 	field, ok := s.spec.m[key]
 	if !ok {

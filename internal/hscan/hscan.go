@@ -11,6 +11,7 @@ import (
 type decoderFunc func(reflect.Value, string) error
 
 var (
+	// 基础类型反射方法
 	// List of built-in decoders indexed by their numeric constant values (eg: reflect.Bool = 1).
 	decoders = []decoderFunc{
 		reflect.Bool:          decodeBool,
@@ -40,12 +41,14 @@ var (
 		reflect.UnsafePointer: decodeUnsupported,
 	}
 
+	// 全局结构map
 	// Global map of struct field specs that is populated once for every new
 	// struct type that is scanned. This caches the field types and the corresponding
 	// decoder functions to avoid iterating through struct fields on subsequent scans.
 	globalStructMap = newStructMap()
 )
 
+// Struct 创建反射对象
 func Struct(dst interface{}) (StructValue, error) {
 	v := reflect.ValueOf(dst)
 
@@ -65,6 +68,7 @@ func Struct(dst interface{}) (StructValue, error) {
 	}, nil
 }
 
+// Scan 将 keys 和 vals 反射到dst中
 // Scan scans the results from a key-value Redis map result set to a destination struct.
 // The Redis keys are matched to the struct's field with the `redis` tag.
 func Scan(dst interface{}, keys []interface{}, vals []interface{}) error {

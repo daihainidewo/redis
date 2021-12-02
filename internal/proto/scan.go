@@ -9,7 +9,7 @@ import (
 	"github.com/go-redis/redis/v8/internal/util"
 )
 
-//Scan 将b转为对应的v
+// Scan 将b转为对应的v
 // Scan parses bytes `b` to `v` with appropriate type.
 //nolint:gocyclo
 func Scan(b []byte, v interface{}) error {
@@ -122,7 +122,7 @@ func Scan(b []byte, v interface{}) error {
 	}
 }
 
-//ScanSlice 将字符串数组转为对应的对象数组
+// ScanSlice 将字符串数组转为对应的对象数组
 func ScanSlice(data []string, slice interface{}) error {
 	v := reflect.ValueOf(slice)
 	if !v.IsValid() {
@@ -138,7 +138,9 @@ func ScanSlice(data []string, slice interface{}) error {
 
 	next := makeSliceNextElemFunc(v)
 	for i, s := range data {
+		// 获取下一个位置的切片内存地址
 		elem := next()
+		// 将s装换为对应的对象
 		if err := Scan([]byte(s), elem.Addr().Interface()); err != nil {
 			err = fmt.Errorf("redis: ScanSlice index=%d value=%q failed: %w", i, s, err)
 			return err
@@ -148,11 +150,12 @@ func ScanSlice(data []string, slice interface{}) error {
 	return nil
 }
 
-//makeSliceNextElemFunc 返回在slice后面添加新元素并返回新元素的方法
+// makeSliceNextElemFunc 返回在slice后面添加新元素并返回新元素的方法
 func makeSliceNextElemFunc(v reflect.Value) func() reflect.Value {
 	elemType := v.Type().Elem()
 
 	if elemType.Kind() == reflect.Ptr {
+		// 指针
 		elemType = elemType.Elem()
 		return func() reflect.Value {
 			if v.Len() < v.Cap() {
@@ -164,12 +167,14 @@ func makeSliceNextElemFunc(v reflect.Value) func() reflect.Value {
 				return elem.Elem()
 			}
 
+			// 利用append扩容
 			elem := reflect.New(elemType)
 			v.Set(reflect.Append(v, elem))
 			return elem.Elem()
 		}
 	}
 
+	// 对象
 	zero := reflect.Zero(elemType)
 	return func() reflect.Value {
 		if v.Len() < v.Cap() {
@@ -177,6 +182,7 @@ func makeSliceNextElemFunc(v reflect.Value) func() reflect.Value {
 			return v.Index(v.Len() - 1)
 		}
 
+		// 利用append扩容
 		v.Set(reflect.Append(v, zero))
 		return v.Index(v.Len() - 1)
 	}
