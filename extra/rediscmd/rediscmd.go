@@ -10,18 +10,21 @@ import (
 	"github.com/go-redis/redis/v8"
 )
 
+// CmdString 将cmd转为可视字符串
 func CmdString(cmd redis.Cmder) string {
 	b := make([]byte, 0, 32)
 	b = AppendCmd(b, cmd)
 	return String(b)
 }
 
+// CmdsString 将cmds转换为
+// 返回 cmds中去重后的命令列表 和 cmds转换为的可视字符串
 func CmdsString(cmds []redis.Cmder) (string, string) {
-	const numCmdLimit = 100
-	const numNameLimit = 10
+	const numCmdLimit = 100 // 最多支持命令数
+	const numNameLimit = 10 // 最多支持不同命令数
 
-	seen := make(map[string]struct{}, numNameLimit)
-	unqNames := make([]string, 0, numNameLimit)
+	seen := make(map[string]struct{}, numNameLimit) // 记录是否已转换
+	unqNames := make([]string, 0, numNameLimit)     // 去重命令列表
 
 	b := make([]byte, 0, 32*len(cmds))
 
@@ -50,9 +53,11 @@ func CmdsString(cmds []redis.Cmder) (string, string) {
 	return summary, String(b)
 }
 
+// AppendCmd 将cmd的参数转为可视字符追加进b
 func AppendCmd(b []byte, cmd redis.Cmder) []byte {
 	const numArgLimit = 32
 
+	// 最多支持32个参数
 	for i, arg := range cmd.Args() {
 		if i > numArgLimit {
 			break
@@ -71,6 +76,7 @@ func AppendCmd(b []byte, cmd redis.Cmder) []byte {
 	return b
 }
 
+// 将v转换成Redis二进制格式
 func appendArg(b []byte, v interface{}) []byte {
 	const argLenLimit = 64
 
@@ -123,18 +129,22 @@ func appendArg(b []byte, v interface{}) []byte {
 	}
 }
 
+// 将src转换为可视字符追加dst
 func appendUTF8String(dst []byte, src []byte) []byte {
 	if isSimple(src) {
+		// 如果是可视ascii直接追加返回
 		dst = append(dst, src...)
 		return dst
 	}
 
 	s := len(dst)
 	dst = append(dst, make([]byte, hex.EncodedLen(len(src)))...)
+	// 转换二进制为可视字符 一个字节变两个字节
 	hex.Encode(dst[s:], src)
 	return dst
 }
 
+// 是否是可视化序列
 func isSimple(b []byte) bool {
 	for _, c := range b {
 		if !isSimpleByte(c) {
@@ -144,6 +154,7 @@ func isSimple(b []byte) bool {
 	return true
 }
 
+// 是不是可视化字符
 func isSimpleByte(c byte) bool {
 	return c >= 0x21 && c <= 0x7e
 }

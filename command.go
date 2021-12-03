@@ -13,17 +13,18 @@ import (
 	"github.com/go-redis/redis/v8/internal/util"
 )
 
+// Cmder 命令接口
 type Cmder interface {
-	Name() string
-	FullName() string
-	Args() []interface{}
-	String() string
-	stringArg(int) string
+	Name() string         // redis 命令
+	FullName() string     // 多个单词的redis命令
+	Args() []interface{}  // 命令参数列表
+	String() string       // 格式化
+	stringArg(int) string // 格式化参数
 	firstKeyPos() int8
 	setFirstKeyPos(int8)
 
-	readTimeout() *time.Duration
-	readReply(rd *proto.Reader) error
+	readTimeout() *time.Duration      // 读超时
+	readReply(rd *proto.Reader) error // 读取值
 
 	SetErr(error)
 	Err() error
@@ -61,6 +62,7 @@ func writeCmd(wr *proto.Writer, cmd Cmder) error {
 	return wr.WriteArgs(cmd.Args())
 }
 
+// 返回命令第一个key的位置
 func cmdFirstKeyPos(cmd Cmder, info *CommandInfo) int {
 	if pos := cmd.firstKeyPos(); pos != 0 {
 		return int(pos)
@@ -110,12 +112,12 @@ func cmdString(cmd Cmder, val interface{}) string {
 	return internal.String(b)
 }
 
-//------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------
 
-// 基础命令
+// 基础命令 描述命令 错误 读超时等
 type baseCmd struct {
 	ctx    context.Context
-	args   []interface{}
+	args   []interface{} // 命令参数 cmd args...
 	err    error
 	keyPos int8
 
@@ -124,6 +126,7 @@ type baseCmd struct {
 
 var _ Cmder = (*Cmd)(nil)
 
+// Name 返回小写 redis command
 func (cmd *baseCmd) Name() string {
 	if len(cmd.args) == 0 {
 		return ""
@@ -132,6 +135,7 @@ func (cmd *baseCmd) Name() string {
 	return internal.ToLower(cmd.stringArg(0))
 }
 
+// FullName 返回多个单词的 redis command
 func (cmd *baseCmd) FullName() string {
 	switch name := cmd.Name(); name {
 	case "cluster", "command":
@@ -147,11 +151,12 @@ func (cmd *baseCmd) FullName() string {
 	}
 }
 
+// Args 返回redis参数
 func (cmd *baseCmd) Args() []interface{} {
 	return cmd.args
 }
 
-// 返回指定参数
+// 返回指定位置的参数
 func (cmd *baseCmd) stringArg(pos int) string {
 	if pos < 0 || pos >= len(cmd.args) {
 		return ""
@@ -165,6 +170,7 @@ func (cmd *baseCmd) firstKeyPos() int8 {
 	return cmd.keyPos
 }
 
+// 设置第一个key的位置
 func (cmd *baseCmd) setFirstKeyPos(keyPos int8) {
 	cmd.keyPos = keyPos
 }
@@ -185,9 +191,9 @@ func (cmd *baseCmd) setReadTimeout(d time.Duration) {
 	cmd._readTimeout = &d
 }
 
-//------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------
 
-// Cmd 请求响应结结构
+// Cmd 通用请求结构
 type Cmd struct {
 	baseCmd
 
@@ -471,7 +477,7 @@ func (cmd *Cmd) readReply(rd *proto.Reader) (err error) {
 	return err
 }
 
-// 解析多个
+// 解析多行
 // sliceParser implements proto.MultiBulkParse.
 func sliceParser(rd *proto.Reader, n int64) (interface{}, error) {
 	vals := make([]interface{}, n)
@@ -493,7 +499,7 @@ func sliceParser(rd *proto.Reader, n int64) (interface{}, error) {
 	return vals, nil
 }
 
-//------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------
 
 type SliceCmd struct {
 	baseCmd
@@ -557,7 +563,7 @@ func (cmd *SliceCmd) readReply(rd *proto.Reader) error {
 	return nil
 }
 
-//------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------
 
 type StatusCmd struct {
 	baseCmd
@@ -597,7 +603,7 @@ func (cmd *StatusCmd) readReply(rd *proto.Reader) (err error) {
 	return err
 }
 
-//------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------
 
 type IntCmd struct {
 	baseCmd
@@ -641,7 +647,7 @@ func (cmd *IntCmd) readReply(rd *proto.Reader) (err error) {
 	return err
 }
 
-//------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------
 
 type IntSliceCmd struct {
 	baseCmd
@@ -691,7 +697,7 @@ func (cmd *IntSliceCmd) readReply(rd *proto.Reader) error {
 	return err
 }
 
-//------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------
 
 type DurationCmd struct {
 	baseCmd
@@ -744,7 +750,7 @@ func (cmd *DurationCmd) readReply(rd *proto.Reader) error {
 	return nil
 }
 
-//------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------
 
 type TimeCmd struct {
 	baseCmd
@@ -801,7 +807,7 @@ func (cmd *TimeCmd) readReply(rd *proto.Reader) error {
 	return err
 }
 
-//------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------
 
 type BoolCmd struct {
 	baseCmd
@@ -859,7 +865,7 @@ func (cmd *BoolCmd) readReply(rd *proto.Reader) error {
 	}
 }
 
-//------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------
 
 type StringCmd struct {
 	baseCmd
@@ -963,7 +969,7 @@ func (cmd *StringCmd) readReply(rd *proto.Reader) (err error) {
 	return err
 }
 
-//------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------
 
 type FloatCmd struct {
 	baseCmd
@@ -1003,7 +1009,7 @@ func (cmd *FloatCmd) readReply(rd *proto.Reader) (err error) {
 	return err
 }
 
-//------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------
 
 type FloatSliceCmd struct {
 	baseCmd
@@ -1056,7 +1062,7 @@ func (cmd *FloatSliceCmd) readReply(rd *proto.Reader) error {
 	return err
 }
 
-//------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------
 
 type StringSliceCmd struct {
 	baseCmd
@@ -1113,7 +1119,7 @@ func (cmd *StringSliceCmd) readReply(rd *proto.Reader) error {
 	return err
 }
 
-//------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------
 
 type BoolSliceCmd struct {
 	baseCmd
@@ -1163,7 +1169,7 @@ func (cmd *BoolSliceCmd) readReply(rd *proto.Reader) error {
 	return err
 }
 
-//------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------
 
 type StringStringMapCmd struct {
 	baseCmd
@@ -1240,7 +1246,7 @@ func (cmd *StringStringMapCmd) readReply(rd *proto.Reader) error {
 	return err
 }
 
-//------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------
 
 type StringIntMapCmd struct {
 	baseCmd
@@ -1296,7 +1302,7 @@ func (cmd *StringIntMapCmd) readReply(rd *proto.Reader) error {
 	return err
 }
 
-//------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------
 
 type StringStructMapCmd struct {
 	baseCmd
@@ -1346,7 +1352,7 @@ func (cmd *StringStructMapCmd) readReply(rd *proto.Reader) error {
 	return err
 }
 
-//------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------
 
 type XMessage struct {
 	ID     string
@@ -1459,7 +1465,7 @@ func stringInterfaceMapParser(rd *proto.Reader, n int64) (interface{}, error) {
 	return m, nil
 }
 
-//------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------
 
 type XStream struct {
 	Stream   string
@@ -1534,7 +1540,7 @@ func (cmd *XStreamSliceCmd) readReply(rd *proto.Reader) error {
 	return err
 }
 
-//------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------
 
 type XPending struct {
 	Count     int64
@@ -1640,7 +1646,7 @@ func (cmd *XPendingCmd) readReply(rd *proto.Reader) error {
 	return err
 }
 
-//------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------
 
 type XPendingExt struct {
 	ID         string
@@ -1727,7 +1733,7 @@ func (cmd *XPendingExtCmd) readReply(rd *proto.Reader) error {
 	return err
 }
 
-//------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------
 
 type XAutoClaimCmd struct {
 	baseCmd
@@ -1786,7 +1792,7 @@ func (cmd *XAutoClaimCmd) readReply(rd *proto.Reader) error {
 	return err
 }
 
-//------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------
 
 type XAutoClaimJustIDCmd struct {
 	baseCmd
@@ -1853,7 +1859,7 @@ func (cmd *XAutoClaimJustIDCmd) readReply(rd *proto.Reader) error {
 	return err
 }
 
-//------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------
 
 type XInfoConsumersCmd struct {
 	baseCmd
@@ -1954,7 +1960,7 @@ func readXConsumerInfo(rd *proto.Reader) (XInfoConsumer, error) {
 	return consumer, nil
 }
 
-//------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------
 
 type XInfoGroupsCmd struct {
 	baseCmd
@@ -2058,7 +2064,7 @@ func readXGroupInfo(rd *proto.Reader) (XInfoGroup, error) {
 	return group, nil
 }
 
-//------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------
 
 type XInfoStreamCmd struct {
 	baseCmd
@@ -2154,7 +2160,7 @@ func xStreamInfoParser(rd *proto.Reader, n int64) (interface{}, error) {
 	return &info, nil
 }
 
-//------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------
 
 type XInfoStreamFullCmd struct {
 	baseCmd
@@ -2454,7 +2460,7 @@ func readXInfoStreamConsumers(rd *proto.Reader) ([]XInfoStreamConsumer, error) {
 	return consumers, nil
 }
 
-//------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------
 
 type ZSliceCmd struct {
 	baseCmd
@@ -2513,7 +2519,7 @@ func (cmd *ZSliceCmd) readReply(rd *proto.Reader) error {
 	return err
 }
 
-//------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------
 
 type ZWithKeyCmd struct {
 	baseCmd
@@ -2577,7 +2583,7 @@ func (cmd *ZWithKeyCmd) readReply(rd *proto.Reader) error {
 	return err
 }
 
-//------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------
 
 type ScanCmd struct {
 	baseCmd
@@ -2629,7 +2635,7 @@ func (cmd *ScanCmd) Iterator() *ScanIterator {
 	}
 }
 
-//------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------
 
 type ClusterNode struct {
 	ID   string
@@ -2741,7 +2747,7 @@ func (cmd *ClusterSlotsCmd) readReply(rd *proto.Reader) error {
 	return err
 }
 
-//------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------
 
 // GeoLocation is used with GeoAdd to add geospatial location.
 type GeoLocation struct {
@@ -2910,7 +2916,7 @@ func newGeoLocationParser(q *GeoRadiusQuery) proto.MultiBulkParse {
 	}
 }
 
-//------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------
 
 // GeoSearchQuery is used for GEOSearch/GEOSearchStore command query.
 type GeoSearchQuery struct {
@@ -3096,7 +3102,7 @@ func (cmd *GeoSearchLocationCmd) readReply(rd *proto.Reader) error {
 	return nil
 }
 
-//------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------
 
 type GeoPos struct {
 	Longitude, Latitude float64
@@ -3170,7 +3176,7 @@ func (cmd *GeoPosCmd) readReply(rd *proto.Reader) error {
 	return err
 }
 
-//------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------
 
 type CommandInfo struct {
 	Name        string
@@ -3325,7 +3331,7 @@ func commandInfoParser(rd *proto.Reader, n int64) (interface{}, error) {
 	return &cmd, nil
 }
 
-//------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------
 
 type cmdsInfoCache struct {
 	fn func(ctx context.Context) (map[string]*CommandInfo, error)
@@ -3361,7 +3367,7 @@ func (c *cmdsInfoCache) Get(ctx context.Context) (map[string]*CommandInfo, error
 	return c.cmds, err
 }
 
-//------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------
 
 type SlowLog struct {
 	ID       int64

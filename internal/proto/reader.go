@@ -29,6 +29,7 @@ func (RedisError) RedisError() {}
 
 //------------------------------------------------------------------------------
 
+// 批量解析指定行数
 type MultiBulkParse func(*Reader, int64) (interface{}, error)
 
 type Reader struct {
@@ -120,6 +121,7 @@ func (r *Reader) ReadReply(m MultiBulkParse) (interface{}, error) {
 			err := fmt.Errorf("redis: got %.100q, but multi bulk parser is nil", line)
 			return nil, err
 		}
+		// 自定义解析数组结构
 		return m(r, n)
 	}
 	return nil, fmt.Errorf("redis: can't parse %.100q", line)

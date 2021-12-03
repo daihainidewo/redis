@@ -14,6 +14,7 @@ import (
 
 var tracer = otel.Tracer("github.com/go-redis/redis")
 
+// TracingHook 实现一个执行命令的hook
 type TracingHook struct{}
 
 var _ redis.Hook = (*TracingHook)(nil)
